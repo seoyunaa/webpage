@@ -1,6 +1,7 @@
 const navToggle = document.querySelector(".nav-toggle");
 const siteNav = document.querySelector(".site-nav");
 const year = document.querySelector("#year");
+const comingSoonButtons = document.querySelectorAll("[data-coming-soon-button]");
 
 if (year) {
   year.textContent = new Date().getFullYear();
@@ -20,3 +21,22 @@ if (navToggle && siteNav) {
     });
   });
 }
+
+comingSoonButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const note = button.parentElement?.querySelector(".coming-soon-note");
+
+    if (!note) {
+      return;
+    }
+
+    note.textContent = "\uacf5\uac1c\uc608\uc815\uc785\ub2c8\ub2e4.";
+    note.classList.add("is-visible");
+
+    clearTimeout(button._comingSoonTimeout);
+    button._comingSoonTimeout = setTimeout(() => {
+      note.classList.remove("is-visible");
+      note.textContent = "";
+    }, 2200);
+  });
+});
