@@ -608,11 +608,13 @@ main {
 
 .site-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
+  align-items: center;
   gap: 1rem;
   padding: 0 0 2.5rem;
   color: var(--muted);
   font-size: 0.92rem;
+  text-align: center;
 }
 
 :focus-visible {
@@ -677,5 +679,6 @@ main {
 
   .site-footer {
     flex-direction: column;
+    justify-content: center;
   }
 }
