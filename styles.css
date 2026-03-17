@@ -29,7 +29,7 @@ body {
   margin: 0;
   min-width: 320px;
   color: var(--ink);
-  font-family: "IBM Plex Sans", "Noto Sans KR", "Noto Sans SC", sans-serif;
+  font-family: "Source Sans 3", "Noto Sans KR", "Noto Sans SC", sans-serif;
   line-height: 1.7;
   background:
     linear-gradient(180deg, #fbf7f0 0%, var(--bg) 36%, #f3eadf 100%),
@@ -343,12 +343,12 @@ main {
 }
 
 .hero-name-korean {
-  font-family: "Noto Sans KR", "IBM Plex Sans", sans-serif;
+  font-family: "Noto Sans KR", "Source Sans 3", sans-serif;
   letter-spacing: 0;
 }
 
 .hero-name-english {
-  font-family: "IBM Plex Sans", "Noto Sans KR", sans-serif;
+  font-family: "Source Sans 3", "Noto Sans KR", sans-serif;
   letter-spacing: 0.08em;
 }
 
