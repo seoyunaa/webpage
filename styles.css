@@ -336,7 +336,7 @@ main {
 }
 
 .hero-name-text {
-  color: var(--ink);
+  color: #735b47;
   font-family: "Noto Sans KR", "IBM Plex Sans", sans-serif;
   font-size: clamp(1.2rem, 1.9vw, 1.42rem);
   font-weight: 600;
