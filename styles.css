@@ -327,6 +327,14 @@ main {
   line-height: 1.45;
 }
 
+.hero-native-name {
+  margin: -0.35rem 0 0.7rem;
+  color: var(--ink);
+  font-family: "Noto Serif KR", "Newsreader", serif;
+  font-size: 1.12rem;
+  font-weight: 500;
+}
+
 .section-heading {
   position: relative;
   max-width: 760px;
