@@ -327,12 +327,23 @@ main {
   line-height: 1.45;
 }
 
+.hero-name-line {
+  gap: 0.7rem;
+  margin-bottom: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: none;
+}
+
+.hero-name-line::before {
+  display: none;
+}
+
 .hero-native-name {
-  margin: -0.35rem 0 0.7rem;
   color: var(--ink);
-  font-family: "Noto Serif KR", "Newsreader", serif;
-  font-size: 1.12rem;
+  font-family: "Noto Sans KR", "IBM Plex Sans", sans-serif;
+  font-size: 0.98rem;
   font-weight: 500;
+  letter-spacing: 0;
 }
 
 .section-heading {
