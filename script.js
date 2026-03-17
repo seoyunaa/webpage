@@ -30,7 +30,8 @@ comingSoonButtons.forEach((button) => {
       return;
     }
 
-    note.textContent = "\uacf5\uac1c\uc608\uc815\uc785\ub2c8\ub2e4.";
+    note.textContent =
+      "\uacf5\uac1c\uc608\uc815\uc785\ub2c8\ub2e4. (Coming soon.)";
     note.classList.add("is-visible");
 
     clearTimeout(button._comingSoonTimeout);
