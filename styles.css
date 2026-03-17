@@ -328,20 +328,34 @@ main {
 }
 
 .hero-name-line {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
-  margin: 0 0 0.9rem;
-  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin: 0 0 1rem;
+  flex-wrap: nowrap;
 }
 
 .hero-name-text {
   color: #735b47;
-  font-family: "Noto Sans KR", "IBM Plex Sans", sans-serif;
-  font-size: clamp(1.2rem, 1.9vw, 1.42rem);
+  font-size: clamp(1.18rem, 1.8vw, 1.38rem);
   font-weight: 600;
-  letter-spacing: 0.02em;
   line-height: 1.1;
+}
+
+.hero-name-korean {
+  font-family: "Noto Sans KR", "IBM Plex Sans", sans-serif;
+  letter-spacing: 0;
+}
+
+.hero-name-english {
+  font-family: "IBM Plex Sans", "Noto Sans KR", sans-serif;
+  letter-spacing: 0.08em;
+}
+
+.hero-name-divider {
+  width: 1px;
+  height: 1rem;
+  background: rgba(133, 104, 83, 0.45);
 }
 
 .section-heading {
