@@ -691,6 +691,52 @@ main {
   font-size: 0.85rem;
 }
 
+.button-with-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hover-translation {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.45rem);
+  transform: translateX(-50%) translateY(4px);
+  padding: 0.32rem 0.55rem;
+  border: 1px solid rgba(197, 181, 160, 0.95);
+  border-radius: 999px;
+  background: rgba(255, 250, 242, 0.98);
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 10px 20px rgba(84, 66, 50, 0.08);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.button-with-tooltip:hover .hover-translation,
+.button-with-tooltip:focus-within .hover-translation {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.button-with-tooltip .coming-soon-note {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  left: 50%;
+  transform: translateX(-50%) translateY(2px);
+  white-space: nowrap;
+}
+
+.button-with-tooltip .coming-soon-note.is-visible {
+  transform: translateX(-50%) translateY(0);
+}
+
 .coming-soon-note {
   color: var(--accent);
   font-size: 0.88rem;

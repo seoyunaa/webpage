@@ -25,13 +25,15 @@ if (navToggle && siteNav) {
 comingSoonButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const note = button.parentElement?.querySelector(".coming-soon-note");
+    const message =
+      button.getAttribute("data-coming-soon-message") ||
+      "\uacf5\uac1c\uc608\uc815\uc785\ub2c8\ub2e4. (Coming soon.)";
 
     if (!note) {
       return;
     }
 
-    note.textContent =
-      "\uacf5\uac1c\uc608\uc815\uc785\ub2c8\ub2e4. (Coming soon.)";
+    note.textContent = message;
     note.classList.add("is-visible");
 
     clearTimeout(button._comingSoonTimeout);
