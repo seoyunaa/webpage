@@ -670,13 +670,6 @@ main {
   font-weight: 600;
 }
 
-.project-highlight {
-  padding: 0.9rem 1rem;
-  border: 1px solid rgba(197, 181, 160, 0.9);
-  border-radius: 16px;
-  background: var(--accent-soft);
-}
-
 .project-output {
   display: flex;
   flex-wrap: wrap;
@@ -796,55 +789,6 @@ main {
   color: var(--muted);
 }
 
-.note-callout p + p {
-  margin-top: 0.95rem;
-}
-
-.metric-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 1rem;
-}
-
-.metric-card {
-  position: relative;
-  overflow: hidden;
-  padding: 1.2rem 1.25rem;
-  background: linear-gradient(180deg, rgba(255, 250, 242, 0.98), rgba(252, 246, 237, 0.96));
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow);
-}
-
-.metric-card::before {
-  content: "";
-  position: absolute;
-  inset: 0.65rem;
-  border: 1px solid rgba(197, 181, 160, 0.45);
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.metric-card .card-label {
-  margin-bottom: 0.65rem;
-}
-
-.metric-value {
-  display: block;
-  font-family: "Newsreader", "Noto Serif KR", "Noto Serif SC", serif;
-  font-size: clamp(2rem, 4vw, 2.7rem);
-  line-height: 1;
-  letter-spacing: -0.03em;
-}
-
-.metric-label {
-  display: block;
-  margin-top: 0.35rem;
-  color: var(--muted);
-  font-size: 0.95rem;
-}
-
 .note-checklist {
   display: grid;
   gap: 0.7rem;
@@ -917,10 +861,6 @@ main {
   }
 
   .note-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .metric-grid {
     grid-template-columns: 1fr;
   }
 
