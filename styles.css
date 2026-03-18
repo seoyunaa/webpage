@@ -677,6 +677,7 @@ main {
   gap: 0.65rem;
 }
 
+.project-link-button,
 .coming-soon-button {
   min-height: 2.2rem;
   padding: 0.45rem 0.9rem;
@@ -713,6 +714,55 @@ main {
   gap: 0.85rem;
   justify-content: center;
   margin-top: 1.85rem;
+}
+
+.note-page {
+  min-height: calc(100vh - 8rem);
+  display: grid;
+  align-items: center;
+  padding: 4rem 0 5rem;
+}
+
+.note-shell {
+  position: relative;
+  overflow: hidden;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2.2rem;
+  background: linear-gradient(180deg, rgba(255, 250, 242, 0.98), rgba(252, 246, 237, 0.96));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.note-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0.65rem;
+  border: 1px solid rgba(197, 181, 160, 0.45);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.note-shell h1 {
+  margin: 0;
+  font-family: "Newsreader", "Noto Serif KR", "Noto Serif SC", serif;
+  font-size: clamp(2.2rem, 4vw, 3.4rem);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.note-shell p {
+  margin: 1rem auto 0;
+  max-width: 36ch;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.note-shell .hero-actions {
+  justify-content: center;
 }
 
 .site-footer {
