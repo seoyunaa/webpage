@@ -777,45 +777,6 @@ main {
   padding: 2rem;
 }
 
-.language-switch {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.45rem;
-  margin-bottom: 1rem;
-}
-
-.language-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 3rem;
-  min-height: 2rem;
-  padding: 0.35rem 0.8rem;
-  border: 1px solid rgba(197, 181, 160, 0.95);
-  border-radius: 999px;
-  background: rgba(255, 250, 242, 0.9);
-  color: var(--muted);
-  font-size: 0.83rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  transition:
-    background-color 160ms ease,
-    color 160ms ease,
-    border-color 160ms ease;
-}
-
-.language-link:hover,
-.language-link:focus-visible {
-  color: var(--ink);
-  border-color: var(--line-strong);
-}
-
-.language-link.is-active {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: #fffaf2;
-}
-
 .note-meta {
   gap: 0.7rem;
   margin-top: 1.35rem;
