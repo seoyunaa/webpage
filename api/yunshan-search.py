@@ -1162,6 +1162,7 @@ def gateway_answer(query: str, evidence: list[dict[str, Any]], model: str | None
             "Authorization": f"Bearer {api_key}",
             "x-api-key": api_key,
             "Content-Type": "application/json",
+            "User-Agent": "YunshanDiary/1.0",
         },
         method="POST",
     )
