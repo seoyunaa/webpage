@@ -569,10 +569,39 @@ body[data-yunshan-page="home"] .search-panel {
   background: rgba(245, 248, 252, 0.9);
   font-size: 0.92rem;
   line-height: 1.6;
+  overflow: visible;
 }
 
 .ai-search-note strong {
   color: #0d2240;
+}
+
+.answer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.55rem 0 0.72rem;
+}
+
+.answer-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.65rem;
+  padding: 0.18rem 0.52rem;
+  color: #315f62;
+  border: 1px solid rgba(49, 95, 98, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.answer-body {
+  max-height: none;
+  overflow: visible;
+  color: var(--ink);
+  white-space: normal;
+  word-break: keep-all;
 }
 
 .analysis-stack {

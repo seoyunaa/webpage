@@ -722,13 +722,43 @@
       if (!response.ok) {
         throw new Error(payload.error || "AI 검색 실패");
       }
-      const answerTitle = payload.used_ai ? "AI Answer" : "검색 답변";
-      const answerNote = payload.used_ai
-        ? ""
-        : `<br><span class="muted">AI Gateway가 꺼져 있거나 집계 질문인 경우, 구조화된 검색 인덱스로 답합니다.</span>`;
+      const answerTitle = payload.used_ai
+        ? "AI Answer"
+        : payload.answer_source === "ontology_query"
+          ? "온톨로지 검색 답변"
+          : "검색 답변";
+      const aiStatus = payload.used_ai ? "AI 사용" : "AI 미사용";
+      const sourceLabel = {
+        ai_gateway_summary: "AI Gateway 요약",
+        ontology_query: "온톨로지 구조화 검색",
+        hybrid_search_fallback: "하이브리드 검색 fallback",
+        ai_gateway: "AI Gateway 생성",
+        deterministic_aggregate: "구조화 집계 답변",
+        deterministic_search_fallback: "검색 인덱스 답변",
+      }[payload.answer_source] || payload.answer_source || "검색 답변";
+      const modelLabel = payload.used_ai
+        ? `모델 ${payload.ai_model || "unknown"}`
+        : `설정 모델 ${payload.ai_model || "unknown"} · 호출 안 함`;
+      const planner = payload.planner || {};
+      const evidenceSourceLabel = {
+        semantic_assertions: "semantic assertions",
+        knowledge_graph_edges: "knowledge graph edges",
+        entries: "entry/entity records",
+        mixed: "mixed evidence",
+      }[payload.evidence_source || planner.evidence_source] || payload.evidence_source || planner.evidence_source || "unknown evidence";
       aiBox.innerHTML = `
-        <strong>${answerTitle}</strong>${answerNote}<br>
-        ${escapeHtml(payload.answer || "답변 없음").replace(/\n/g, "<br>")}
+        <strong>${answerTitle}</strong>
+        <div class="answer-meta">
+          <span class="answer-pill">${escapeHtml(aiStatus)}</span>
+          <span class="answer-pill">${escapeHtml(modelLabel)}</span>
+          <span class="answer-pill">RAG ${payload.rag_used ? "사용" : "미사용"}</span>
+          <span class="answer-pill">${escapeHtml(sourceLabel)}</span>
+          <span class="answer-pill">의도 ${escapeHtml(planner.intent || "hybrid_search")}</span>
+          <span class="answer-pill">근거 ${escapeHtml(evidenceSourceLabel)}</span>
+          <span class="answer-pill">${escapeHtml(payload.retrieval_mode || "unknown")}</span>
+          <span class="answer-pill">신뢰도 ${escapeHtml(payload.confidence || "unknown")}</span>
+        </div>
+        <div class="answer-body">${escapeHtml(payload.answer || "답변 없음").replace(/\n/g, "<br>")}</div>
       `;
       if (payload.results?.length) {
         renderSearchResults(payload.results.map((row) => entryById(row.entry_id)).filter(Boolean));

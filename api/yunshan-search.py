@@ -13,6 +13,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 SEARCH_INDEX_PATH = ROOT / "data" / "search" / "yunshan_search_index.jsonl"
 PORTAL_DATA_PATH = ROOT / "data" / "yunshan" / "portal-data.json"
+DEFAULT_GATEWAY_MODEL = "claude-sonnet-4-6"
 
 MANUAL_ALIAS_GROUPS = [
     ["郭畀", "곽비", "雲山", "운산"],
@@ -29,6 +30,10 @@ MANUAL_ALIAS_GROUPS = [
 ]
 
 MEETING_PREDICATES = {"visited", "encountered", "welcomed", "dined_with", "traveled_with"}
+PLACE_PREDICATES = {"visited", "was_at", "traveled_from", "traveled_to", "traveled_via"}
+JOURNEY_PREDICATES = {"traveled_from", "traveled_to", "traveled_via"}
+OFFICE_PREDICATES = {"held_office", "visited", "was_at"}
+MATERIAL_PREDICATES = {"returned_to", "gave_to", "transmitted_document", "exchanged_with", "participated_in"}
 SELF_PERSON_ID = "person-0001"
 PREDICATE_LABELS = {
     "visited": "방문",
@@ -36,6 +41,32 @@ PREDICATE_LABELS = {
     "welcomed": "맞이함",
     "dined_with": "식사/술자리",
     "traveled_with": "동행",
+    "visited_not": "방문했으나 만나지 못함",
+    "welcomed_not": "맞이하려 했으나 만나지 못함",
+    "was_at": "소재/방문",
+    "traveled_from": "출발",
+    "traveled_to": "도착",
+    "traveled_via": "경유",
+    "held_office": "관직",
+    "returned_to": "돌려줌",
+    "gave_to": "전달/증여",
+    "transmitted_document": "문서 전달",
+    "exchanged_with": "교환",
+}
+NOISY_ENTITY_ALIASES = {
+    "郭畀",
+    "곽비",
+    "雲山",
+    "운산",
+    "杭州",
+    "항주",
+    "杭城",
+    "錢塘",
+    "전당",
+    "佛",
+    "佛像",
+    "法堂",
+    "불교",
 }
 
 KOREAN_PARTICLE_RE = re.compile(
@@ -250,6 +281,10 @@ def confidence_from_score(score: float) -> str:
     return "low"
 
 
+def active_model() -> str:
+    return os.environ.get("YUNSHAN_GATEWAY_MODEL", DEFAULT_GATEWAY_MODEL)
+
+
 def local_search(query: str, index: list[dict[str, Any]], limit: int = 8) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
     terms = query_terms(query)
     intents = classify_query(query)
@@ -389,9 +424,10 @@ def person_frequency_payload(query: str, index: list[dict[str, Any]]) -> dict[st
     ]
     for index_no, row in enumerate(ranked[:8], start=1):
         entry_ids = sorted(row["entry_ids"])
-        dates = ", ".join(short_entry_label(entry_id, entry_map) for entry_id in entry_ids[:10])
-        if len(entry_ids) > 10:
-            dates += f" 외 {len(entry_ids) - 10}일"
+        date_limit = len(entry_ids) if index_no == 1 else 10
+        dates = ", ".join(short_entry_label(entry_id, entry_map) for entry_id in entry_ids[:date_limit])
+        if len(entry_ids) > date_limit:
+            dates += f" 외 {len(entry_ids) - date_limit}일"
         predicates = " · ".join(sorted(row["predicates"]))
         lines.append(f"{index_no}. {row['label']}: {len(entry_ids)}개 날짜 ({dates}) - {predicates}")
     lines.extend(
@@ -456,6 +492,563 @@ def person_frequency_payload(query: str, index: list[dict[str, Any]]) -> dict[st
     }
 
 
+def predicate_of(record: dict[str, Any]) -> str:
+    metadata = record.get("metadata") or {}
+    return str(metadata.get("predicate") or metadata.get("edge_type") or "")
+
+
+def entity_ids_of(record: dict[str, Any]) -> set[str]:
+    return {
+        str(entity.get("entity_id"))
+        for entity in record.get("entities") or []
+        if entity.get("entity_id")
+    }
+
+
+def entity_type_of(record: dict[str, Any]) -> str:
+    entity_type = record.get("entity_type")
+    if entity_type:
+        return str(entity_type)
+    entities = record.get("entities") or []
+    if entities:
+        return str(entities[0].get("entity_type") or "")
+    record_id = str(record.get("record_id") or "")
+    if ":" in record_id:
+        prefix = record_id.split(":", 1)[1].split("-", 1)[0]
+        return prefix
+    return ""
+
+
+def primary_entity(record: dict[str, Any]) -> dict[str, Any] | None:
+    entities = record.get("entities") or []
+    return entities[0] if entities else None
+
+
+def entry_map(index: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {
+        (record.get("source_entry_ids") or [""])[0]: record
+        for record in index
+        if record.get("record_type") == "entry" and record.get("source_entry_ids")
+    }
+
+
+def entry_order_map(entries: dict[str, dict[str, Any]]) -> dict[str, int]:
+    return {
+        entry_id: int((record.get("metadata") or {}).get("entry_index", 9999))
+        for entry_id, record in entries.items()
+    }
+
+
+def sorted_entry_ids(entry_ids: set[str] | list[str], entries: dict[str, dict[str, Any]]) -> list[str]:
+    order = entry_order_map(entries)
+    return sorted(set(entry_ids), key=lambda entry_id: (order.get(entry_id, 9999), entry_id))
+
+
+def date_label_for(entry_id: str, entries: dict[str, dict[str, Any]]) -> str:
+    return ((entries.get(entry_id) or {}).get("metadata") or {}).get("date_label") or entry_id
+
+
+def entry_excerpt(entry_id: str, entries: dict[str, dict[str, Any]], limit: int = 110) -> str:
+    record = entries.get(entry_id) or {}
+    return compact(record.get("translation_snippet") or record.get("summary") or record.get("original_snippet"), limit)
+
+
+def result_rows_from_entries(entry_ids: list[str], entries: dict[str, dict[str, Any]], score: float = 120) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for entry_id in entry_ids:
+        record = entries.get(entry_id) or {}
+        rows.append(
+            {
+                "entry_id": entry_id,
+                "date_label": date_label_for(entry_id, entries),
+                "summary": record.get("summary") or compact(record.get("translation_snippet"), 160),
+                "score": score,
+                "evidence_count": 1,
+            }
+        )
+    return rows
+
+
+def entry_evidence(
+    entry_id: str,
+    entries: dict[str, dict[str, Any]],
+    score: float,
+    matched: list[str],
+    matched_entities: list[dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    record = entries.get(entry_id)
+    if not record:
+        return None
+    item = format_evidence(record, score, matched)
+    if matched_entities is not None:
+        item["matched_entities"] = matched_entities
+    return item
+
+
+def planner_payload(
+    query: str,
+    intent: str,
+    operation: str,
+    evidence_source: str,
+    entity_matches: list[dict[str, Any]] | None = None,
+    query_terms_used: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "intent": intent,
+        "operation": operation,
+        "evidence_source": evidence_source,
+        "query_terms": query_terms_used or query_terms(query)[:12],
+        "entity_matches": entity_matches or [],
+    }
+
+
+def safe_entity_terms(record: dict[str, Any]) -> list[str]:
+    label_text = set(str(value) for value in record.get("labels") or [] if value)
+    entity = primary_entity(record) or {}
+    entity_label = str(entity.get("label") or "")
+    terms: list[str] = []
+    for value in [*(record.get("labels") or []), *(record.get("aliases") or [])]:
+        text = str(value or "").strip()
+        if not text:
+            continue
+        if text in NOISY_ENTITY_ALIASES and text not in label_text and text != entity_label:
+            continue
+        terms.append(text)
+    return list(dict.fromkeys(terms))
+
+
+def find_entity_matches(
+    query: str,
+    index: list[dict[str, Any]],
+    allowed_types: set[str],
+    limit: int = 6,
+) -> list[dict[str, Any]]:
+    normalized_query = normalize_text(query)
+    terms = [term for term in query_terms(query) if len(term) > 1]
+    scored: list[tuple[float, bool, dict[str, Any]]] = []
+    for record in index:
+        if record.get("record_type") != "entity":
+            continue
+        entity_type = entity_type_of(record)
+        if entity_type not in allowed_types:
+            continue
+        entity = primary_entity(record)
+        if not entity:
+            continue
+        candidate_terms = safe_entity_terms(record)
+        normalized_terms = [normalize_text(term) for term in candidate_terms if term]
+        score = 0.0
+        matched_terms: list[str] = []
+        entity_label = normalize_text(entity.get("label"))
+        exact_label_match = False
+        if entity_label and entity_label in normalized_query:
+            score += 90
+            exact_label_match = True
+            matched_terms.append(str(entity.get("label")))
+        if any(entity_label and entity_label == normalize_text(term) for term in terms):
+            score += 90
+            exact_label_match = True
+            matched_terms.append(str(entity.get("label")))
+        for term in terms:
+            normalized_term = normalize_text(term)
+            if not normalized_term:
+                continue
+            for candidate in normalized_terms:
+                if normalized_term == candidate:
+                    score += 50
+                    matched_terms.append(term)
+                    break
+                if len(normalized_term) >= 2 and normalized_term in candidate:
+                    score += 22
+                    matched_terms.append(term)
+                    break
+        if score <= 0:
+            continue
+        scored.append(
+            (
+                score,
+                exact_label_match,
+                {
+                    "entity_id": entity.get("entity_id"),
+                    "entity_type": entity_type,
+                    "label": entity.get("label"),
+                    "matched_terms": list(dict.fromkeys(matched_terms))[:8],
+                    "entry_count": (record.get("metadata") or {}).get("entry_count"),
+                    "record": record,
+                },
+            )
+        )
+    if any(exact for _score, exact, _match in scored):
+        scored = [item for item in scored if item[1]]
+    scored.sort(key=lambda item: (-item[0], str(item[2].get("label") or "")))
+    matches: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for _score, _exact, match in scored:
+        entity_id = str(match.get("entity_id") or "")
+        if entity_id in seen:
+            continue
+        seen.add(entity_id)
+        match = dict(match)
+        match.pop("record", None)
+        matches.append(match)
+        if len(matches) >= limit:
+            break
+    return matches
+
+
+def entity_records_for_matches(index: list[dict[str, Any]], entity_matches: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    wanted = {str(match.get("entity_id")) for match in entity_matches if match.get("entity_id")}
+    records: dict[str, dict[str, Any]] = {}
+    for record in index:
+        if record.get("record_type") != "entity":
+            continue
+        entity = primary_entity(record)
+        entity_id = str((entity or {}).get("entity_id") or "")
+        if entity_id in wanted:
+            records[entity_id] = record
+    return records
+
+
+def record_matches_entities(record: dict[str, Any], entity_ids: set[str]) -> bool:
+    return bool(entity_ids & entity_ids_of(record))
+
+
+def evidence_source_from_record_types(record_types: set[str]) -> str:
+    if record_types <= {"assertion"}:
+        return "semantic_assertions"
+    if record_types <= {"graph_edge"}:
+        return "knowledge_graph_edges"
+    if record_types <= {"entry", "entity"}:
+        return "entries"
+    return "mixed"
+
+
+def entity_records_payload(
+    query: str,
+    index: list[dict[str, Any]],
+    intent: str,
+    operation: str,
+    allowed_entity_types: set[str],
+    predicates: set[str] | None,
+    intro_label: str,
+    basis_label: str,
+) -> dict[str, Any] | None:
+    matches = find_entity_matches(query, index, allowed_entity_types)
+    if not matches:
+        return None
+    entries = entry_map(index)
+    entity_records = entity_records_for_matches(index, matches)
+    wanted_ids = {str(match.get("entity_id")) for match in matches if match.get("entity_id")}
+    matched_entities = [
+        {
+            "entity_id": match.get("entity_id"),
+            "entity_type": match.get("entity_type"),
+            "label": match.get("label"),
+        }
+        for match in matches
+    ]
+
+    source_entry_ids: set[str] = set()
+    structured_records: list[dict[str, Any]] = []
+    for record in index:
+        if not record_matches_entities(record, wanted_ids):
+            continue
+        predicate = predicate_of(record)
+        if predicates is not None and record.get("record_type") in {"assertion", "graph_edge"} and predicate not in predicates:
+            continue
+        if record.get("record_type") in {"assertion", "graph_edge"}:
+            structured_records.append(record)
+        if record.get("record_type") in {"entry", "assertion", "graph_edge"}:
+            source_entry_ids.update(record.get("source_entry_ids") or [])
+
+    for record in entity_records.values():
+        source_entry_ids.update(record.get("source_entry_ids") or [])
+
+    ordered_entries = sorted_entry_ids(source_entry_ids, entries)
+    if not ordered_entries:
+        return None
+
+    labels = " · ".join(match.get("label") or match.get("entity_id") or "" for match in matches[:4])
+    lines = [f"{intro_label} '{labels}' 관련 기록은 {len(ordered_entries)}개 날짜에서 확인됩니다."]
+    for entry_id in ordered_entries[:12]:
+        lines.append(f"- {date_label_for(entry_id, entries)} ({entry_id}): {entry_excerpt(entry_id, entries)}")
+    if len(ordered_entries) > 12:
+        lines.append(f"- 그 밖에 {len(ordered_entries) - 12}개 날짜가 더 있습니다.")
+    lines.append(f"기준: {basis_label}")
+
+    evidence: list[dict[str, Any]] = []
+    for record in structured_records[:6]:
+        item = format_evidence(record, 120, ["온톨로지", *[str(match.get("label")) for match in matches[:3]]])
+        evidence.append(item)
+    for entry_id in ordered_entries:
+        if len(evidence) >= 8:
+            break
+        item = entry_evidence(entry_id, entries, 110, [str(match.get("label")) for match in matches[:3]], matched_entities)
+        if item:
+            evidence.append(item)
+
+    record_types = {item.get("record_type") for item in evidence if item.get("record_type")}
+    evidence_source = evidence_source_from_record_types(record_types)
+    return {
+        "answer": "\n".join(lines),
+        "evidence": evidence,
+        "results": result_rows_from_entries(ordered_entries[:12], entries),
+        "retrieval_mode": f"ontology_{operation}",
+        "confidence": "high",
+        "planner": planner_payload(query, intent, operation, evidence_source, matches),
+        "evidence_source": evidence_source,
+    }
+
+
+def wants_arrival_people(query: str) -> bool:
+    text = normalize_text(query)
+    return (
+        ("항주" in text or "杭州" in text)
+        and any(token in text for token in ("도착", "입성", "직후", "들어"))
+        and any(token in text for token in ("누구", "사람", "인물", "만났"))
+    )
+
+
+def arrival_people_payload(query: str, index: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not wants_arrival_people(query):
+        return None
+    entries = entry_map(index)
+    target_entries = ["entry-1308-09-22", "entry-1308-09-23"]
+    people_by_entry: dict[str, dict[str, set[str]]] = {entry_id: {} for entry_id in target_entries}
+    evidence_records: list[dict[str, Any]] = []
+    for record in index:
+        if record.get("record_type") not in {"assertion", "graph_edge"}:
+            continue
+        if predicate_of(record) not in MEETING_PREDICATES:
+            continue
+        source_ids = set(record.get("source_entry_ids") or [])
+        if not source_ids & set(target_entries):
+            continue
+        entities = record.get("entities") or []
+        if len(entities) < 2:
+            continue
+        if entities[0].get("entity_id") != SELF_PERSON_ID:
+            continue
+        target = entities[1]
+        if target.get("entity_type") != "person" or target.get("entity_id") == SELF_PERSON_ID:
+            continue
+        for entry_id in source_ids & set(target_entries):
+            bucket = people_by_entry.setdefault(entry_id, {})
+            label = str(target.get("label") or target.get("entity_id"))
+            bucket.setdefault(label, set()).add(PREDICATE_LABELS.get(predicate_of(record), predicate_of(record)))
+        evidence_records.append(record)
+
+    if not any(people_by_entry.values()):
+        return None
+    lines = ["항주 도착 직후 만난 인물은 다음과 같이 확인됩니다."]
+    for entry_id in target_entries:
+        people = people_by_entry.get(entry_id) or {}
+        if not people:
+            continue
+        details = ", ".join(
+            f"{name}({ '·'.join(sorted(predicates)) })"
+            for name, predicates in sorted(people.items())
+        )
+        lines.append(f"- {date_label_for(entry_id, entries)} ({entry_id}): {details}")
+    lines.append("기준: 항주 입성일(entry-1308-09-22)과 바로 다음날(entry-1308-09-23)의 인물 관계 assertion/graph edge.")
+
+    evidence = [format_evidence(record, 130, ["항주 도착", "인물"]) for record in evidence_records[:8]]
+    ordered_entries = [entry_id for entry_id in target_entries if people_by_entry.get(entry_id)]
+    return {
+        "answer": "\n".join(lines),
+        "evidence": evidence,
+        "results": result_rows_from_entries(ordered_entries, entries),
+        "retrieval_mode": "ontology_arrival_people",
+        "confidence": "high",
+        "planner": planner_payload(query, "arrival_people", "arrival_people", "mixed"),
+        "evidence_source": "mixed",
+    }
+
+
+def not_met_payload(query: str, index: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if "not_met" not in classify_query(query):
+        return None
+    entries = entry_map(index)
+    evidence_records: list[dict[str, Any]] = []
+    rows: dict[tuple[str, str], set[str]] = {}
+    for record in index:
+        if record.get("record_type") not in {"assertion", "graph_edge"}:
+            continue
+        metadata = record.get("metadata") or {}
+        predicate = predicate_of(record)
+        is_not_met = bool(metadata.get("negated")) or predicate in {"visited_not", "welcomed_not"} or "not_met" in record.get("aliases", [])
+        if not is_not_met:
+            continue
+        entities = record.get("entities") or []
+        target = next(
+            (
+                entity
+                for entity in entities[1:]
+                if entity.get("entity_type") == "person" and entity.get("entity_id") != SELF_PERSON_ID
+            ),
+            None,
+        )
+        if not target:
+            continue
+        evidence_records.append(record)
+        label = str(target.get("label") or target.get("entity_id"))
+        for entry_id in record.get("source_entry_ids") or []:
+            rows.setdefault((entry_id, label), set()).add(PREDICATE_LABELS.get(predicate, predicate or "not_met"))
+
+    if not rows:
+        return None
+    ordered = sorted(rows.items(), key=lambda item: (entry_order_map(entries).get(item[0][0], 9999), item[0][1]))
+    lines = [f"방문했지만 만나지 못한 기록은 {len({entry for (entry, _label), _pred in ordered})}개 날짜에서 확인됩니다."]
+    for (entry_id, label), predicates in ordered[:14]:
+        lines.append(f"- {date_label_for(entry_id, entries)} ({entry_id}): {label} - {'·'.join(sorted(predicates))}")
+    if len(ordered) > 14:
+        lines.append(f"- 그 밖에 {len(ordered) - 14}건이 더 있습니다.")
+    lines.append("기준: negated assertion, visited_not/welcomed_not graph edge, not_met alias.")
+
+    evidence = [format_evidence(record, 125, ["방문 실패", "not_met"]) for record in evidence_records[:8]]
+    ordered_entries = sorted_entry_ids({entry_id for (entry_id, _label), _predicates in rows.items()}, entries)
+    return {
+        "answer": "\n".join(lines),
+        "evidence": evidence,
+        "results": result_rows_from_entries(ordered_entries[:12], entries),
+        "retrieval_mode": "ontology_not_met_records",
+        "confidence": "high",
+        "planner": planner_payload(query, "not_met_records", "not_met_records", "mixed"),
+        "evidence_source": "mixed",
+    }
+
+
+def wants_journey(query: str) -> bool:
+    text = normalize_text(query)
+    return any(token in text for token in ("이동 경로", "여정", "경로", "수로", "항주 도착 전후", "항주 이동"))
+
+
+def journey_payload(query: str, index: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not wants_journey(query):
+        return None
+    entries = entry_map(index)
+    entry_ids: set[str] = set()
+    evidence_records: list[dict[str, Any]] = []
+    for record in index:
+        predicate = predicate_of(record)
+        if record.get("record_type") in {"assertion", "graph_edge"} and predicate in JOURNEY_PREDICATES:
+            entry_ids.update(record.get("source_entry_ids") or [])
+            evidence_records.append(record)
+        if record.get("record_type") == "entry":
+            metadata = record.get("metadata") or {}
+            if metadata.get("route") or metadata.get("transport"):
+                entry_ids.update(record.get("source_entry_ids") or [])
+
+    ordered_entries = sorted_entry_ids(entry_ids, entries)
+    if "항주" in normalize_text(query) and any(token in normalize_text(query) for token in ("도착", "전후", "입성")):
+        ordered_entries = [
+            entry_id
+            for entry_id in ordered_entries
+            if entry_order_map(entries).get(entry_id, 9999) <= entry_order_map(entries).get("entry-1308-09-22", 9999)
+        ]
+    if not ordered_entries:
+        return None
+    lines = ["항주 이동 경로는 날짜 흐름상 다음 기록에서 확인됩니다."]
+    for entry_id in ordered_entries[:12]:
+        metadata = (entries.get(entry_id) or {}).get("metadata") or {}
+        route = metadata.get("route") or "이동 기록"
+        transport = metadata.get("transport")
+        suffix = f" · 이동수단: {transport}" if transport else ""
+        lines.append(f"- {date_label_for(entry_id, entries)} ({entry_id}): {route}{suffix}")
+    lines.append("기준: entry.route/transport와 traveled_from/traveled_to/traveled_via 온톨로지 관계.")
+
+    evidence: list[dict[str, Any]] = []
+    for record in evidence_records[:5]:
+        evidence.append(format_evidence(record, 118, ["이동", "여정"]))
+    for entry_id in ordered_entries:
+        if len(evidence) >= 8:
+            break
+        item = entry_evidence(entry_id, entries, 112, ["이동", "여정"])
+        if item:
+            evidence.append(item)
+    return {
+        "answer": "\n".join(lines),
+        "evidence": evidence,
+        "results": result_rows_from_entries(ordered_entries[:12], entries),
+        "retrieval_mode": "ontology_journey_records",
+        "confidence": "high",
+        "planner": planner_payload(query, "journey_records", "journey_records", "mixed"),
+        "evidence_source": "mixed",
+    }
+
+
+def ontology_query_payload(query: str, index: list[dict[str, Any]]) -> dict[str, Any] | None:
+    aggregate = person_frequency_payload(query, index)
+    if aggregate:
+        aggregate["planner"] = planner_payload(query, "person_frequency", "person_frequency", "semantic_assertions")
+        aggregate["evidence_source"] = "semantic_assertions"
+        return aggregate
+
+    for builder in (arrival_people_payload, not_met_payload, journey_payload):
+        payload = builder(query, index)
+        if payload:
+            return payload
+
+    text = normalize_text(query)
+    if re.search(r"문서|작품|소비품|경전|早飯|조반|아침밥|차|술|佛|遺教經", text):
+        payload = entity_records_payload(
+            query,
+            index,
+            "material_records",
+            "material_records",
+            {"document", "work", "consumable"},
+            MATERIAL_PREDICATES,
+            "물질/문헌",
+            "document/work/consumable entity와 물질 관련 predicate를 우선 조회했습니다.",
+        )
+        if payload:
+            return payload
+
+    if re.search(r"관직|관청|업무|省中|성중|도목|同知|都目|제국기구", text):
+        payload = entity_records_payload(
+            query,
+            index,
+            "office_institution_records",
+            "office_institution_records",
+            {"office", "institution", "place"},
+            OFFICE_PREDICATES | PLACE_PREDICATES,
+            "관직/관청",
+            "office/institution/place entity와 held_office/visited/was_at 관계를 우선 조회했습니다.",
+        )
+        if payload:
+            return payload
+
+    if re.search(r"누구|인물|사람|만났|장덕휘|張德輝|德輝|이숙의|탕군백", text):
+        payload = entity_records_payload(
+            query,
+            index,
+            "person_records",
+            "person_records",
+            {"person"},
+            MEETING_PREDICATES | {"held_office", "gave_to", "dispatched", "transmitted_document", "parted_from"},
+            "인물",
+            "person entity와 인물 관계 predicate를 우선 조회했습니다.",
+        )
+        if payload:
+            return payload
+
+    if re.search(r"어디|공간|장소|항주|杭州|吳山|오산|西湖|서호|省中|성중|사찰|관청", text):
+        payload = entity_records_payload(
+            query,
+            index,
+            "place_or_institution_records",
+            "place_or_institution_records",
+            {"place", "institution"},
+            PLACE_PREDICATES | OFFICE_PREDICATES,
+            "공간/기관",
+            "place/institution entity와 was_at/visited/traveled 관계를 우선 조회했습니다.",
+        )
+        if payload:
+            return payload
+
+    return None
+
+
 def fallback_answer(query: str, evidence: list[dict[str, Any]], results: list[dict[str, Any]]) -> str:
     if not evidence:
         return f"'{query}'와 직접 연결되는 근거를 찾지 못했습니다. 인물명, 지명, 원문 한자, 날짜 표현을 조금 바꿔 다시 검색해 보세요."
@@ -475,7 +1068,7 @@ def gateway_answer(query: str, evidence: list[dict[str, Any]]) -> str:
         raise RuntimeError("YUNSHAN_GATEWAY_API_KEY is not set")
 
     base_url = os.environ.get("YUNSHAN_GATEWAY_BASE_URL", "https://factchat-cloud.mindlogic.ai/v1/gateway").rstrip("/")
-    model = os.environ.get("YUNSHAN_GATEWAY_MODEL", "claude-sonnet-4-6")
+    model = active_model()
     endpoint = f"{base_url}/chat/completions/"
 
     context = []
@@ -540,21 +1133,29 @@ def gateway_answer(query: str, evidence: list[dict[str, Any]]) -> str:
 
 def search_payload(query: str, use_ai: bool = True) -> dict[str, Any]:
     index = load_index()
-    evidence, results, retrieval_mode = local_search(query, index)
-    aggregate_payload = person_frequency_payload(query, index)
-    if aggregate_payload:
-        evidence = aggregate_payload["evidence"]
-        results = aggregate_payload["results"]
-        retrieval_mode = aggregate_payload["retrieval_mode"]
-        answer = aggregate_payload["answer"]
+    ontology_payload = ontology_query_payload(query, index)
+    if ontology_payload:
+        evidence = ontology_payload["evidence"]
+        results = ontology_payload["results"]
+        retrieval_mode = ontology_payload["retrieval_mode"]
+        answer = ontology_payload["answer"]
+        confidence = ontology_payload.get("confidence", "high")
+        planner = ontology_payload.get("planner")
+        evidence_source = ontology_payload.get("evidence_source", "mixed")
     else:
+        evidence, results, retrieval_mode = local_search(query, index)
         answer = fallback_answer(query, evidence, results)
+        confidence = confidence_from_score(evidence[0]["score"]) if evidence else "none"
+        planner = planner_payload(query, "hybrid_search", "score_records", "mixed")
+        evidence_source = "mixed"
     used_ai = False
     ai_error = None
-    if use_ai and evidence and not aggregate_payload:
+    answer_source = "ontology_query" if ontology_payload else "hybrid_search_fallback"
+    if use_ai and evidence:
         try:
             answer = gateway_answer(query, evidence)
             used_ai = True
+            answer_source = "ai_gateway_summary"
         except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, KeyError, TimeoutError, OSError) as exc:
             ai_error = str(exc)
 
@@ -571,20 +1172,25 @@ def search_payload(query: str, use_ai: bool = True) -> dict[str, Any]:
             if topic not in matched_topics:
                 matched_topics.append(topic)
 
-    top_score = evidence[0]["score"] if evidence else 0
     payload = {
         "query": query,
         "answer": answer,
         "used_ai": used_ai,
+        "ai_model": active_model(),
+        "answer_source": answer_source,
+        "rag_used": True,
+        "rag_index": "yunshan_search_index.jsonl",
         "retrieval_mode": retrieval_mode,
-        "confidence": confidence_from_score(top_score) if evidence else "none",
+        "evidence_source": evidence_source,
+        "confidence": confidence,
+        "planner": planner,
         "results": results,
         "evidence": evidence,
         "matched_entities": matched_entities[:30],
         "matched_topics": matched_topics[:30],
     }
-    if aggregate_payload:
-        payload["aggregate"] = aggregate_payload["aggregate"]
+    if ontology_payload and ontology_payload.get("aggregate"):
+        payload["aggregate"] = ontology_payload["aggregate"]
     if ai_error:
         payload["ai_error"] = ai_error
     return payload
