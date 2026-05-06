@@ -312,6 +312,17 @@ def normalize_search_mode(mode: Any, use_ai: Any = None) -> str:
     return normalized
 
 
+def gateway_api_key() -> str:
+    # Vercel env vars are case-sensitive. Keep the descriptive name as primary,
+    # but support the deployed short key name the project currently uses.
+    return (
+        os.environ.get("YUNSHAN_GATEWAY_API_KEY")
+        or os.environ.get("YSD")
+        or os.environ.get("ysd")
+        or ""
+    ).strip()
+
+
 def local_search(query: str, index: list[dict[str, Any]], limit: int = 8) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
     terms = query_terms(query)
     intents = classify_query(query)
@@ -1090,9 +1101,9 @@ def fallback_answer(query: str, evidence: list[dict[str, Any]], results: list[di
 
 
 def gateway_answer(query: str, evidence: list[dict[str, Any]], model: str | None = None) -> str:
-    api_key = os.environ.get("YUNSHAN_GATEWAY_API_KEY")
+    api_key = gateway_api_key()
     if not api_key:
-        raise RuntimeError("YUNSHAN_GATEWAY_API_KEY is not set")
+        raise RuntimeError("Gateway API key is not set. Expected YUNSHAN_GATEWAY_API_KEY or ysd.")
 
     base_url = os.environ.get("YUNSHAN_GATEWAY_BASE_URL", "https://factchat-cloud.mindlogic.ai/v1/gateway").rstrip("/")
     model = active_model(model)
@@ -1183,9 +1194,9 @@ def search_payload(query: str, use_ai: bool = True, mode: str = "auto", model: s
     answer_source = "ontology_query" if ontology_payload else "hybrid_search_fallback"
     ai_call_status = "not_requested"
     if search_mode in {"auto", "ai"} and evidence:
-        if search_mode == "auto" and not os.environ.get("YUNSHAN_GATEWAY_API_KEY"):
+        if search_mode == "auto" and not gateway_api_key():
             ai_call_status = "skipped_no_key"
-            ai_error = "YUNSHAN_GATEWAY_API_KEY is not set"
+            ai_error = "Gateway API key is not set. Expected YUNSHAN_GATEWAY_API_KEY or ysd."
         else:
             ai_call_status = "attempted"
             try:
