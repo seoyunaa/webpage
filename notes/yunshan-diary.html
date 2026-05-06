@@ -70,14 +70,77 @@
             RAG 답변을 생성합니다.
           </p>
         </div>
-        <form class="search-box" id="yunshan-search-form">
-          <label class="sr-only" for="yunshan-query">검색 질문</label>
-          <input
-            id="yunshan-query"
-            type="search"
-            autocomplete="off"
-            placeholder="예: 장덕휘가 나오는 기록을 찾아줘">
-          <button type="submit">검색</button>
+        <form class="yunshan-search-console" id="yunshan-search-form">
+          <div class="yunshan-search-group">
+            <div class="yunshan-search-mode-bar" role="group" aria-label="검색 모드 선택">
+              <button class="search-mode-pill is-selected" type="button" data-search-mode="auto">
+                <span class="search-mode-mark search-mode-mark-auto" aria-hidden="true">A</span>
+                <span>자동</span>
+              </button>
+              <button class="search-mode-pill" type="button" data-search-mode="ontology">
+                <span class="search-mode-mark search-mode-mark-ontology" aria-hidden="true">O</span>
+                <span>온톨로지</span>
+              </button>
+              <button class="search-mode-pill" type="button" data-search-mode="ai">
+                <span class="search-mode-mark search-mode-mark-ai" aria-hidden="true">AI</span>
+                <span>AI 요약</span>
+              </button>
+            </div>
+
+            <label class="yunshan-search-wrap">
+              <span class="sr-only">검색 질문</span>
+              <input
+                id="yunshan-query"
+                type="search"
+                autocomplete="off"
+                placeholder="예: 장덕휘가 나오는 기록을 찾아줘">
+            </label>
+
+            <button class="yunshan-search-button" type="submit" aria-label="검색" title="검색">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="6.5"></circle>
+                <path d="M16 16l4 4"></path>
+              </svg>
+              <span class="sr-only">검색</span>
+            </button>
+            <button
+              class="yunshan-search-button yunshan-search-reset"
+              id="yunshan-search-reset"
+              type="button"
+              aria-label="검색 초기화"
+              title="검색 초기화"
+              hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 12a8 8 0 1 1-2.34-5.66"></path>
+                <path d="M20 4v5h-5"></path>
+              </svg>
+              <span class="sr-only">검색 초기화</span>
+            </button>
+            <button
+              class="yunshan-settings-toggle"
+              id="yunshan-search-settings-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="yunshan-search-settings"
+              title="검색 설정">
+              설정
+            </button>
+          </div>
+
+          <section id="yunshan-search-settings" class="yunshan-search-settings is-hidden" aria-label="검색 설정">
+            <div>
+              <strong>검색 방식</strong>
+              <p>자동은 온톨로지로 근거를 먼저 찾고, 서버에 AI 키가 있으면 선택 모델로 요약합니다.</p>
+            </div>
+            <label class="yunshan-model-field" for="yunshan-model-select">
+              <span>AI 모델</span>
+              <select id="yunshan-model-select">
+                <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+                <option value="gemini-3.1-flash-lite-preview">gemini-3.1-flash-lite-preview</option>
+                <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview</option>
+              </select>
+            </label>
+          </section>
         </form>
         <div class="example-row" aria-label="예시 질문">
           <button type="button" data-example="항주 도착 직후 누구를 만났어?">항주 도착 직후 누구를 만났어?</button>

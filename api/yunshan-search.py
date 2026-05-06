@@ -14,6 +14,12 @@ ROOT = Path(__file__).resolve().parents[1]
 SEARCH_INDEX_PATH = ROOT / "data" / "search" / "yunshan_search_index.jsonl"
 PORTAL_DATA_PATH = ROOT / "data" / "yunshan" / "portal-data.json"
 DEFAULT_GATEWAY_MODEL = "claude-sonnet-4-6"
+DEFAULT_ALLOWED_MODELS = [
+    "claude-sonnet-4-6",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-3.1-pro-preview",
+]
+SEARCH_MODES = {"auto", "ontology", "ai"}
 
 MANUAL_ALIAS_GROUPS = [
     ["郭畀", "곽비", "雲山", "운산"],
@@ -281,8 +287,29 @@ def confidence_from_score(score: float) -> str:
     return "low"
 
 
-def active_model() -> str:
+def allowed_models() -> list[str]:
+    configured = os.environ.get("YUNSHAN_GATEWAY_ALLOWED_MODELS", "")
+    values = [item.strip() for item in configured.split(",") if item.strip()]
+    if not values:
+        values = DEFAULT_ALLOWED_MODELS
+    default_model = os.environ.get("YUNSHAN_GATEWAY_MODEL", DEFAULT_GATEWAY_MODEL).strip()
+    return list(dict.fromkeys([default_model, *values]))
+
+
+def active_model(requested_model: Any = None) -> str:
+    requested = str(requested_model or "").strip()
+    if requested and requested in allowed_models():
+        return requested
     return os.environ.get("YUNSHAN_GATEWAY_MODEL", DEFAULT_GATEWAY_MODEL)
+
+
+def normalize_search_mode(mode: Any, use_ai: Any = None) -> str:
+    if use_ai is False:
+        return "ontology"
+    normalized = str(mode or "auto").strip().lower()
+    if normalized not in SEARCH_MODES:
+        return "auto"
+    return normalized
 
 
 def local_search(query: str, index: list[dict[str, Any]], limit: int = 8) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
@@ -1062,13 +1089,13 @@ def fallback_answer(query: str, evidence: list[dict[str, Any]], results: list[di
     return "\n".join(lines)
 
 
-def gateway_answer(query: str, evidence: list[dict[str, Any]]) -> str:
+def gateway_answer(query: str, evidence: list[dict[str, Any]], model: str | None = None) -> str:
     api_key = os.environ.get("YUNSHAN_GATEWAY_API_KEY")
     if not api_key:
         raise RuntimeError("YUNSHAN_GATEWAY_API_KEY is not set")
 
     base_url = os.environ.get("YUNSHAN_GATEWAY_BASE_URL", "https://factchat-cloud.mindlogic.ai/v1/gateway").rstrip("/")
-    model = active_model()
+    model = active_model(model)
     endpoint = f"{base_url}/chat/completions/"
 
     context = []
@@ -1131,7 +1158,9 @@ def gateway_answer(query: str, evidence: list[dict[str, Any]]) -> str:
     return payload["choices"][0]["message"]["content"]
 
 
-def search_payload(query: str, use_ai: bool = True) -> dict[str, Any]:
+def search_payload(query: str, use_ai: bool = True, mode: str = "auto", model: str | None = None) -> dict[str, Any]:
+    search_mode = normalize_search_mode(mode, use_ai)
+    selected_model = active_model(model)
     index = load_index()
     ontology_payload = ontology_query_payload(query, index)
     if ontology_payload:
@@ -1151,13 +1180,33 @@ def search_payload(query: str, use_ai: bool = True) -> dict[str, Any]:
     used_ai = False
     ai_error = None
     answer_source = "ontology_query" if ontology_payload else "hybrid_search_fallback"
-    if use_ai and evidence:
+    ai_call_status = "not_requested"
+    if search_mode in {"auto", "ai"} and evidence:
+        if search_mode == "auto" and not os.environ.get("YUNSHAN_GATEWAY_API_KEY"):
+            ai_call_status = "skipped_no_key"
+            ai_error = "YUNSHAN_GATEWAY_API_KEY is not set"
+        else:
+            ai_call_status = "attempted"
+            try:
+                answer = gateway_answer(query, evidence, selected_model)
+                used_ai = True
+                answer_source = "ai_gateway_summary"
+                ai_call_status = "success"
+            except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, KeyError, TimeoutError, OSError) as exc:
+                ai_error = str(exc)
+                ai_call_status = "failed"
+    elif search_mode == "ontology":
+        ai_call_status = "not_requested"
+
+    if search_mode == "ai" and evidence and not used_ai and not ai_error:
         try:
-            answer = gateway_answer(query, evidence)
+            answer = gateway_answer(query, evidence, selected_model)
             used_ai = True
             answer_source = "ai_gateway_summary"
+            ai_call_status = "success"
         except (RuntimeError, urllib.error.URLError, urllib.error.HTTPError, KeyError, TimeoutError, OSError) as exc:
             ai_error = str(exc)
+            ai_call_status = "failed"
 
     matched_entities: list[dict[str, Any]] = []
     seen_entities: set[str] = set()
@@ -1176,7 +1225,11 @@ def search_payload(query: str, use_ai: bool = True) -> dict[str, Any]:
         "query": query,
         "answer": answer,
         "used_ai": used_ai,
-        "ai_model": active_model(),
+        "ai_model": selected_model,
+        "requested_model": str(model or "").strip(),
+        "allowed_models": allowed_models(),
+        "search_mode": search_mode,
+        "ai_call_status": ai_call_status,
         "answer_source": answer_source,
         "rag_used": True,
         "rag_index": "yunshan_search_index.jsonl",
@@ -1210,6 +1263,8 @@ class handler(BaseHTTPRequestHandler):
                 response(self, 400, {"error": "query is required"})
                 return
             use_ai = body.get("use_ai", True) is not False
-            response(self, 200, search_payload(query, use_ai=use_ai))
+            mode = str(body.get("mode") or "auto")
+            model = str(body.get("model") or "").strip() or None
+            response(self, 200, search_payload(query, use_ai=use_ai, mode=mode, model=model))
         except Exception as exc:
             response(self, 500, {"error": str(exc)})

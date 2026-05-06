@@ -27,6 +27,15 @@
   };
 
   const PAGE_SIZE = 48;
+  const SEARCH_MODE_STORAGE_KEY = "yunshanSearchMode";
+  const SEARCH_MODEL_STORAGE_KEY = "yunshanSearchModel";
+  const DEFAULT_SEARCH_MODE = "auto";
+  const DEFAULT_SEARCH_MODEL = "claude-sonnet-4-6";
+  const SEARCH_MODE_LABELS = {
+    auto: "자동",
+    ontology: "온톨로지만",
+    ai: "AI 요약",
+  };
   const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
   const ENTITY_CATEGORY_KEYS = [
     "persons",
@@ -694,6 +703,63 @@
     bindEntryButtons(target);
   }
 
+  function storedSearchMode() {
+    const value = localStorage.getItem(SEARCH_MODE_STORAGE_KEY) || DEFAULT_SEARCH_MODE;
+    return ["auto", "ontology", "ai"].includes(value) ? value : DEFAULT_SEARCH_MODE;
+  }
+
+  function selectedSearchMode() {
+    const active = $(".search-mode-pill.is-selected");
+    return active?.dataset.searchMode || storedSearchMode();
+  }
+
+  function setSearchMode(mode) {
+    const nextMode = ["auto", "ontology", "ai"].includes(mode) ? mode : DEFAULT_SEARCH_MODE;
+    localStorage.setItem(SEARCH_MODE_STORAGE_KEY, nextMode);
+    $all(".search-mode-pill").forEach((button) => {
+      const selected = button.dataset.searchMode === nextMode;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
+  }
+
+  function selectedSearchModel() {
+    const select = $("#yunshan-model-select");
+    return select?.value || localStorage.getItem(SEARCH_MODEL_STORAGE_KEY) || DEFAULT_SEARCH_MODEL;
+  }
+
+  function setSearchModel(model) {
+    const nextModel = model || DEFAULT_SEARCH_MODEL;
+    localStorage.setItem(SEARCH_MODEL_STORAGE_KEY, nextModel);
+    const select = $("#yunshan-model-select");
+    if (select && Array.from(select.options).some((option) => option.value === nextModel)) {
+      select.value = nextModel;
+    }
+  }
+
+  function resetHomeSearch() {
+    const input = $("#yunshan-query");
+    const results = $("#yunshan-search-results");
+    const aiBox = $("#yunshan-ai-box");
+    const resetButton = $("#yunshan-search-reset");
+    if (input) {
+      input.value = "";
+      input.focus();
+    }
+    if (results) {
+      results.innerHTML = "";
+    }
+    if (aiBox) {
+      aiBox.innerHTML = `
+        <strong>검색 대기 중</strong><br>
+        모드를 고르고 질문을 입력하면 온톨로지 근거와 AI 호출 상태를 함께 보여줍니다.
+      `;
+    }
+    if (resetButton) {
+      resetButton.hidden = true;
+    }
+  }
+
   async function runSearch(query) {
     const localResults = localSearch(query);
     renderSearchResults(localResults);
@@ -701,22 +767,30 @@
     if (!aiBox) {
       return;
     }
+    const mode = selectedSearchMode();
+    const model = selectedSearchModel();
+    const modeLabel = SEARCH_MODE_LABELS[mode] || mode;
+    const resetButton = $("#yunshan-search-reset");
+    if (resetButton) {
+      resetButton.hidden = false;
+    }
 
     if (window.location.protocol === "file:") {
       aiBox.innerHTML = `
         <strong>정적 검색 결과 ${localResults.length}건</strong><br>
+        선택 모드: ${escapeHtml(modeLabel)} · 모델: ${escapeHtml(model)}<br>
         지금은 file:// 미리보기라 AI API를 직접 호출하지 않습니다.
         배포 후에는 같은 질문이 <code>/api/yunshan-search</code>로 전달됩니다.
       `;
       return;
     }
 
-    aiBox.innerHTML = "AI 답변을 생성하는 중입니다...";
+    aiBox.innerHTML = `${escapeHtml(modeLabel)} 검색을 실행하는 중입니다...`;
     try {
       const response = await fetch("/api/yunshan-search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, mode, model }),
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -739,6 +813,13 @@
       const modelLabel = payload.used_ai
         ? `모델 ${payload.ai_model || "unknown"}`
         : `설정 모델 ${payload.ai_model || "unknown"} · 호출 안 함`;
+      const callStatusLabel = {
+        success: "AI 호출 성공",
+        failed: "AI 호출 실패",
+        skipped_no_key: "AI 키 없음",
+        not_requested: "AI 미요청",
+        attempted: "AI 호출 중",
+      }[payload.ai_call_status] || payload.ai_call_status || "AI 상태 미상";
       const planner = payload.planner || {};
       const evidenceSourceLabel = {
         semantic_assertions: "semantic assertions",
@@ -750,7 +831,9 @@
         <strong>${answerTitle}</strong>
         <div class="answer-meta">
           <span class="answer-pill">${escapeHtml(aiStatus)}</span>
+          <span class="answer-pill">모드 ${escapeHtml(SEARCH_MODE_LABELS[payload.search_mode] || payload.search_mode || modeLabel)}</span>
           <span class="answer-pill">${escapeHtml(modelLabel)}</span>
+          <span class="answer-pill">${escapeHtml(callStatusLabel)}</span>
           <span class="answer-pill">RAG ${payload.rag_used ? "사용" : "미사용"}</span>
           <span class="answer-pill">${escapeHtml(sourceLabel)}</span>
           <span class="answer-pill">의도 ${escapeHtml(planner.intent || "hybrid_search")}</span>
@@ -776,16 +859,59 @@
     if (!form) {
       return;
     }
+    const queryInput = $("#yunshan-query");
+    const resetButton = $("#yunshan-search-reset");
+    const settingsToggle = $("#yunshan-search-settings-toggle");
+    const settingsPanel = $("#yunshan-search-settings");
+    const modelSelect = $("#yunshan-model-select");
+
+    setSearchMode(storedSearchMode());
+    setSearchModel(localStorage.getItem(SEARCH_MODEL_STORAGE_KEY) || DEFAULT_SEARCH_MODEL);
+
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      const query = $("#yunshan-query").value.trim();
+      const query = queryInput?.value.trim();
       if (query) {
         runSearch(query);
       }
     });
+    $all(".search-mode-pill", form).forEach((button) => {
+      button.addEventListener("click", () => {
+        setSearchMode(button.dataset.searchMode);
+      });
+    });
+    if (modelSelect) {
+      modelSelect.addEventListener("change", () => {
+        setSearchModel(modelSelect.value);
+      });
+    }
+    if (settingsToggle && settingsPanel) {
+      settingsToggle.addEventListener("click", () => {
+        const isOpen = !settingsPanel.classList.contains("is-hidden");
+        settingsPanel.classList.toggle("is-hidden", isOpen);
+        settingsToggle.classList.toggle("is-active", !isOpen);
+        settingsToggle.setAttribute("aria-expanded", isOpen ? "false" : "true");
+      });
+    }
+    if (resetButton) {
+      resetButton.addEventListener("click", resetHomeSearch);
+    }
+    if (queryInput) {
+      queryInput.addEventListener("input", () => {
+        if (resetButton) {
+          resetButton.hidden = !queryInput.value.trim();
+        }
+      });
+      queryInput.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          resetHomeSearch();
+        }
+      });
+    }
     $all("[data-example]").forEach((button) => {
       button.addEventListener("click", () => {
-        $("#yunshan-query").value = button.dataset.example;
+        queryInput.value = button.dataset.example;
         runSearch(button.dataset.example);
       });
     });
