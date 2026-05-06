@@ -722,8 +722,12 @@
       if (!response.ok) {
         throw new Error(payload.error || "AI 검색 실패");
       }
+      const answerTitle = payload.used_ai ? "AI Answer" : "검색 답변";
+      const answerNote = payload.used_ai
+        ? ""
+        : `<br><span class="muted">AI Gateway가 꺼져 있거나 집계 질문인 경우, 구조화된 검색 인덱스로 답합니다.</span>`;
       aiBox.innerHTML = `
-        <strong>AI Answer</strong><br>
+        <strong>${answerTitle}</strong>${answerNote}<br>
         ${escapeHtml(payload.answer || "답변 없음").replace(/\n/g, "<br>")}
       `;
       if (payload.results?.length) {
