@@ -1149,6 +1149,7 @@ def gateway_answer(query: str, evidence: list[dict[str, Any]], model: str | None
         data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {api_key}",
+            "x-api-key": api_key,
             "Content-Type": "application/json",
         },
         method="POST",
