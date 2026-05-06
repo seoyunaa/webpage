@@ -1,49 +1,104 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Yunshan Diary Project Page | Yuna Seo</title>
-    <link
-      rel="canonical"
-      href="https://yunaseo.com/notes/yunshan-diary.html"
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+KR:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="../styles.css" />
-  </head>
-  <body>
-    <div class="page">
-      <header class="site-header">
-        <a class="brand" href="../index.html" aria-label="Return to Yuna Seo homepage">
-          <span class="brand-photo-frame" aria-hidden="true">
-            <img class="brand-photo" src="../profile.jpg" alt="" />
-          </span>
-          <span class="brand-name">YUNA SEO</span>
-        </a>
-      </header>
+﻿<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>운산일기 프로젝트 | Yuna Seo</title>
+  <link rel="canonical" href="https://yunaseo.com/notes/yunshan-diary.html">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="./yunshan-diary.css">
+</head>
+<body data-yunshan-page="home">
+  <div class="page-shell" data-yunshan-app>
+    <nav class="page-topbar" aria-label="주요 페이지">
+      <div class="page-nav-links">
+        <a class="topbar-link is-current" href="./yunshan-diary.html" aria-current="page">운산일기 프로젝트</a>
+        <a class="topbar-link" href="./yunshan-calendar.html">달력</a>
+        <a class="topbar-link" href="./yunshan-people.html">인물</a>
+        <a class="topbar-link" href="./yunshan-places.html">공간</a>
+        <a class="topbar-link" href="./yunshan-institutions.html">제국기구</a>
+        <a class="topbar-link" href="./yunshan-materials.html">물질</a>
+        <a class="topbar-link" href="./yunshan-topics.html">토픽</a>
+      </div>
+      <a class="topbar-link topbar-home" href="../index.html">HOME</a>
+    </nav>
 
-      <main class="note-page">
-        <article class="note-shell">
-          <h1>Yunshan Diary Project Page</h1>
-          <p>This page is reserved for future project pages.</p>
-          <div class="hero-actions">
-            <a class="button button-primary" href="../index.html">
-              Home
-            </a>
-          </div>
-        </article>
-      </main>
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Yunshan Diary Hangzhou Portal</p>
+        <h1>운산일기 프로젝트</h1>
+        <p class="hero-text">
+          《운산일기》는 원대 문인 곽비(郭畀)가 남긴 일기 자료입니다. 이 공개 페이지는
+          지대원년(1308) 항주로 이동하고 항주에 머문 구간을 대상으로, 원문과 번역을
+          날짜 흐름에 따라 읽고 인물·공간·관직·물질·토픽 정보를 함께 탐색할 수 있도록
+          정리한 디지털 연구 페이지입니다. AI 검색은 질문에 맞는 날짜와 원문 근거를
+          먼저 찾아 보여주고, 배포 환경에서는 항주 구간 데이터를 바탕으로 관련 기록을
+          요약해 답변합니다.
+        </p>
+      </div>
+      <div class="hero-stats" id="yunshan-stats" aria-label="데이터 요약">
+        <div class="stat-card">
+          <span class="stat-label">Entries</span>
+          <strong id="entries-total">-</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Persons</span>
+          <strong id="people-total">-</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Spaces</span>
+          <strong id="places-total">-</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Entities</span>
+          <strong id="entities-total">-</strong>
+        </div>
+      </div>
+    </header>
 
-      <footer class="site-footer">
-        <p>&copy; <span id="year"></span> Yuna Seo</p>
-      </footer>
-    </div>
+    <section class="search-section">
+      <article class="panel service-panel search-panel">
+        <div class="panel-head">
+          <h2>운산일기 AI 검색</h2>
+          <p>
+            질문을 입력하면 요약, 원문, 번역, 인물, 공간, 관직, 물질, 토픽을 함께 읽어
+            관련 기록을 먼저 추천합니다. 배포 환경에서는 Vercel Python API를 통해
+            RAG 답변을 생성합니다.
+          </p>
+        </div>
+        <form class="search-box" id="yunshan-search-form">
+          <label class="sr-only" for="yunshan-query">검색 질문</label>
+          <input
+            id="yunshan-query"
+            type="search"
+            autocomplete="off"
+            placeholder="예: 장덕휘가 나오는 기록을 찾아줘">
+          <button type="submit">검색</button>
+        </form>
+        <div class="example-row" aria-label="예시 질문">
+          <button type="button" data-example="항주 도착 직후 누구를 만났어?">항주 도착 직후 누구를 만났어?</button>
+          <button type="button" data-example="장덕휘가 나오는 기록">장덕휘가 나오는 기록</button>
+          <button type="button" data-example="불교 경전 관련 기록">불교 경전 관련 기록</button>
+          <button type="button" data-example="오산이나 서호가 나오는 날">오산이나 서호가 나오는 날</button>
+        </div>
+        <div id="yunshan-ai-box" class="ai-search-note">
+          로컬 파일 미리보기에서는 정적 검색 결과를 보여주고,
+          AI 답변은 배포 후 <code>/api/yunshan-search</code>에서 작동합니다.
+        </div>
+        <div id="yunshan-search-results" class="analysis-stack"></div>
+      </article>
+    </section>
+  </div>
 
-    <script src="../script.js"></script>
-  </body>
+  <script src="../data/yunshan/portal-data.js"></script>
+  <script src="./yunshan-diary.js"></script>
+</body>
 </html>
+
+
+
+

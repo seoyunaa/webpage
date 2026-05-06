@@ -1,0 +1,50 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>운산일기 물질 | Yuna Seo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="./yunshan-diary.css">
+</head>
+<body data-yunshan-page="materials">
+  <div class="page-shell" data-yunshan-app>
+    <nav class="page-topbar" aria-label="주요 페이지">
+      <div class="page-nav-links">
+        <a class="topbar-link" href="./yunshan-diary.html">운산일기 프로젝트</a>
+        <a class="topbar-link" href="./yunshan-calendar.html">달력</a>
+        <a class="topbar-link" href="./yunshan-people.html">인물</a>
+        <a class="topbar-link" href="./yunshan-places.html">공간</a>
+        <a class="topbar-link" href="./yunshan-institutions.html">제국기구</a>
+        <a class="topbar-link is-current" href="./yunshan-materials.html" aria-current="page">물질</a>
+        <a class="topbar-link" href="./yunshan-topics.html">토픽</a>
+      </div>
+      <a class="topbar-link topbar-home" href="../index.html">HOME</a>
+    </nav>
+    <section class="feature-section">
+      <section class="panel service-panel">
+        <div class="panel-content">
+          <div class="tab-bar" aria-label="물질 유형">
+            <button class="tab-button is-active" type="button" data-panel-tab="materials" data-tab-value="documents">문서</button>
+            <button class="tab-button" type="button" data-panel-tab="materials" data-tab-value="works">작품</button>
+            <button class="tab-button" type="button" data-panel-tab="materials" data-tab-value="consumables">소비품</button>
+          </div>
+          <div id="materials-panel-body" class="analysis-stack"></div>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <script src="../data/yunshan/portal-data.js"></script>
+  <script src="./yunshan-diary.js"></script>
+</body>
+</html>
+
+
+
+
+
